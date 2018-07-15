@@ -180,9 +180,6 @@ func main() {
 	}
 
 	if conf.PrintTable {
-		for _, d := range domains {
-			fmt.Println(d.Name)
-		}
 		PrintTable(conf, conf.Out, domains)
 	} else if conf.PrintJSON {
 		domainsData := Domains{Domains: []*domain.DomainData{}}
