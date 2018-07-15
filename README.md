@@ -6,13 +6,13 @@ Gets information about SSL certificates, so you know when it's time to renew the
 
 Print table with colors and formatted header
 
-```
+```bash
 go-cert --colors --formatting example.com github.com
 ```
 
 Print JSON
 
-```
+```bash
 go-cert --output json example.com github.com
 ```
 
