@@ -14,30 +14,18 @@ import (
 	"github.com/urfave/cli"
 )
 
-//Config holds all config params
-type Config struct {
-	//MinDays, when to warn for cert expiration
-	Out        io.Writer
-	MinDays    int
-	Domains    []string
-	PrintTable bool
-	PrintJSON  bool
-	Colors     bool
-	Formatting bool
-	Location   *time.Location
-}
-
-//Domains holds multiple DomainData for printing JSON
-type Domains struct {
+//domainsHolder holds multiple DomainData for printing JSON
+type domainsHolder struct {
 	Domains []*domain.DomainData `json:"domains"`
 }
 
-//PrintTable prints a table with the domains
-func PrintTable(conf *Config, w io.Writer, domains []*domain.Domain) {
+//printTable prints a table with the domains
+func printTable(conf *config, domains []*domain.Domain) {
+	w := conf.WriterValue["out"]
 	t := tb.InitTable(3, " ", []uint{tb.CenterHeader, tb.AlignRight | tb.CenterHeader, tb.CenterHeader, tb.AlignCenter | tb.CenterHeader})
 
 	headerFormat := []tb.Attribute{}
-	if conf.Formatting == true {
+	if conf.BoolValue["formatting"] == true {
 		headerFormat = append(headerFormat, tb.Bold)
 	}
 
@@ -50,18 +38,18 @@ func PrintTable(conf *Config, w io.Writer, domains []*domain.Domain) {
 		},
 	)
 	for _, d := range domains {
-		domainData := d.GetData(conf.Location)
+		domainData := d.GetData(conf.LocationValue["location"])
 		dayColor := []tb.Attribute{}
 		statusColor := []tb.Attribute{}
 
-		if conf.Colors {
+		if conf.BoolValue["colors"] {
 			dayColor = []tb.Attribute{tb.FgGreen}
 			statusColor = []tb.Attribute{tb.FgGreen}
 		}
-		if domainData.DaysLeft < conf.MinDays && conf.Colors {
+		if domainData.DaysLeft < conf.IntValue["minDays"] && conf.BoolValue["colors"] {
 			dayColor[0] = tb.FgRed
 		}
-		if d.Error != nil && conf.Colors {
+		if d.Error != nil && conf.BoolValue["colors"] {
 			statusColor[0] = tb.FgRed
 		}
 		t.AddRow(
@@ -78,43 +66,65 @@ func PrintTable(conf *Config, w io.Writer, domains []*domain.Domain) {
 
 func main() {
 	loc := time.Local
-	conf := &Config{
-		Out:        os.Stdout,
-		MinDays:    20,
-		Domains:    []string{},
-		PrintTable: false,
-		PrintJSON:  false,
-		Colors:     false,
-		Formatting: false,
-		Location:   loc,
+
+	conf := &config{
+		WriterValue: map[string]io.Writer{
+			"out": os.Stdout,
+		},
+
+		IntValue: map[string]int{
+			"minDays": 20,
+		},
+
+		StringValue: map[string]string{
+			"outputType": "table",
+		},
+
+		StringValues: map[string][]string{
+			"domains": []string{},
+		},
+
+		BoolValue: map[string]bool{
+			"colors":     false,
+			"formatting": false,
+		},
+
+		LocationValue: map[string]*time.Location{
+			"location": loc,
+		},
+	}
+
+	if checkConfigDefaults(conf) == false {
+		log.Panic("You must set all default values for every item in your config struct")
 	}
 
 	app := cli.NewApp()
 	app.Name = "go-cert"
 	app.Usage = "check days left on SSL certificates"
 	app.Version = "0.0.1"
-	app.Compiled = time.Now()
 	app.Authors = []cli.Author{
 		cli.Author{
 			Name:  "Rasmus Lindroth",
 			Email: "rasmus@lindroth.xyz",
 		},
 	}
-	app.ArgsUsage = "domains"
+	app.UsageText = "go-cert [OPTION]... DOMAIN [DOMAIN ...]"
+	app.ArgsUsage = "domain [domain...]"
 
 	app.Flags = []cli.Flag{
 		cli.IntFlag{
 			Name:  "days, d",
-			Value: 20,
-			Usage: "days left on certificate warning",
+			Usage: "days `INT` left on certificate warning",
+			Value: conf.IntValue["minDays"],
 		},
 		cli.StringFlag{
 			Name:  "location, l",
-			Usage: "used for time zone, e.g. Europe/Stockholm. Defaults to local",
+			Usage: "`LOC` used for time zone, e.g. Europe/Stockholm. Defaults to local",
 		},
 		cli.StringFlag{
 			Name:  "output, o",
-			Usage: "table (default), json",
+			Usage: "output `TYPE`: table, json, text (| seperator)",
+			Value: conf.StringValue["outputType"],
 		},
 		cli.BoolFlag{
 			Name:  "colors, c",
@@ -122,44 +132,18 @@ func main() {
 		},
 		cli.BoolFlag{
 			Name:  "formatting, f",
-			Usage: "uses bold in table header",
+			Usage: "add bold in table header",
 		},
 	}
 
 	app.Action = func(c *cli.Context) error {
 		if c.NArg() > 0 {
 			for _, d := range c.Args() {
-				conf.Domains = append(conf.Domains, d)
+				conf.StringValues["domains"] = append(conf.StringValues["domains"], d)
 			}
 		}
 
-		conf.MinDays = c.Int("days")
-		if c.String("location") != "" {
-			loc, err := time.LoadLocation(c.String("location"))
-			if err == nil {
-				conf.Location = loc
-			}
-		}
-
-		if c.String("output") != "table" && c.String("output") != "json" {
-			//Print error because not valid?
-			conf.PrintTable = true
-			conf.PrintJSON = false
-		} else if c.String("output") == "table" {
-			conf.PrintTable = true
-			conf.PrintJSON = false
-		} else if c.String("output") == "json" {
-			conf.PrintJSON = true
-			conf.PrintTable = false
-		}
-
-		if c.Bool("colors") {
-			conf.Colors = c.Bool("colors")
-		}
-		if c.Bool("formatting") {
-			conf.Formatting = c.Bool("formatting")
-		}
-
+		mapConfCli(conf, c)
 		return nil
 	}
 
@@ -170,7 +154,7 @@ func main() {
 
 	domains := []*domain.Domain{}
 
-	for _, s := range conf.Domains {
+	for _, s := range conf.StringValues["domains"] {
 		d, err := domain.InitDomain(s)
 
 		if err != nil {
@@ -179,14 +163,25 @@ func main() {
 		domains = append(domains, d)
 	}
 
-	if conf.PrintTable {
-		PrintTable(conf, conf.Out, domains)
-	} else if conf.PrintJSON {
-		domainsData := Domains{Domains: []*domain.DomainData{}}
+	if len(conf.StringValues["domains"]) == 0 {
+		return
+	}
+
+	if conf.StringValue["outputType"] == "table" {
+		printTable(conf, domains)
+	} else if conf.StringValue["outputType"] == "json" {
+		domainsData := domainsHolder{Domains: []*domain.DomainData{}}
 		for _, d := range domains {
-			domainsData.Domains = append(domainsData.Domains, d.GetData(conf.Location))
+			domainsData.Domains = append(domainsData.Domains, d.GetData(conf.LocationValue["location"]))
 		}
 		jb, _ := json.Marshal(domainsData)
 		fmt.Println(string(jb))
+	} else if conf.StringValue["outputType"] == "text" {
+		for _, d := range domains {
+			data := d.GetData(conf.LocationValue["location"])
+			conf.WriterValue["out"].Write([]byte(
+				fmt.Sprintf("%s|%d|%s|%s\n", data.Name, data.DaysLeft, data.EndTime, data.Status),
+			))
+		}
 	}
 }
