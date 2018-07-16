@@ -35,7 +35,7 @@ github.com|688|2020-06-03 14:00:00 +0200 CEST|ok
 
 # Help
 ```
-NAME:
+NAME:                                                                         
    go-cert - check days left on SSL certificates
 
 USAGE:
@@ -54,6 +54,7 @@ GLOBAL OPTIONS:
    --days INT, -d INT      days INT left on certificate warning (default: 20)
    --location LOC, -l LOC  LOC used for time zone, e.g. Europe/Stockholm. Defaults to local
    --output TYPE, -o TYPE  output TYPE: table, json, text (| seperator) (default: "table")
+   --expiring, -e          only list certs where (days left < --days)
    --colors, -c            add colors in table output
    --formatting, -f        add bold in table header
    --help, -h              show help

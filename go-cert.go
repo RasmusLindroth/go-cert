@@ -16,7 +16,7 @@ import (
 
 //domainsHolder holds multiple DomainData for printing JSON
 type domainsHolder struct {
-	Domains []*domain.DomainData `json:"domains"`
+	Domains []*domain.Data `json:"domains"`
 }
 
 //printTable prints a table with the domains
@@ -38,7 +38,10 @@ func printTable(conf *config, domains []*domain.Domain) {
 		},
 	)
 	for _, d := range domains {
-		domainData := d.GetData(conf.LocationValue["location"])
+		data := d.GetData(conf.LocationValue["location"])
+		if conf.BoolValue["onlyExpiring"] && data.DaysLeft >= conf.IntValue["minDays"] {
+			continue
+		}
 		dayColor := []tb.Attribute{}
 		statusColor := []tb.Attribute{}
 
@@ -46,7 +49,7 @@ func printTable(conf *config, domains []*domain.Domain) {
 			dayColor = []tb.Attribute{tb.FgGreen}
 			statusColor = []tb.Attribute{tb.FgGreen}
 		}
-		if domainData.DaysLeft < conf.IntValue["minDays"] && conf.BoolValue["colors"] {
+		if data.DaysLeft < conf.IntValue["minDays"] && conf.BoolValue["colors"] {
 			dayColor[0] = tb.FgRed
 		}
 		if d.Error != nil && conf.BoolValue["colors"] {
@@ -55,9 +58,9 @@ func printTable(conf *config, domains []*domain.Domain) {
 		t.AddRow(
 			[]*tb.Column{
 				&tb.Column{Text: d.Name},
-				&tb.Column{Text: strconv.Itoa(domainData.DaysLeft), Format: dayColor},
-				&tb.Column{Text: domainData.EndTime.Format("2006-01-02 15:04")},
-				&tb.Column{Text: domainData.Status, Format: statusColor},
+				&tb.Column{Text: strconv.Itoa(data.DaysLeft), Format: dayColor},
+				&tb.Column{Text: data.EndTime.Format("2006-01-02 15:04")},
+				&tb.Column{Text: data.Status, Format: statusColor},
 			},
 		)
 	}
@@ -85,8 +88,9 @@ func main() {
 		},
 
 		BoolValue: map[string]bool{
-			"colors":     false,
-			"formatting": false,
+			"colors":       false,
+			"formatting":   false,
+			"onlyExpiring": false,
 		},
 
 		LocationValue: map[string]*time.Location{
@@ -125,6 +129,10 @@ func main() {
 			Name:  "output, o",
 			Usage: "output `TYPE`: table, json, text (| seperator)",
 			Value: conf.StringValue["outputType"],
+		},
+		cli.BoolFlag{
+			Name:  "expiring, e",
+			Usage: "only list certs where (days left < --days)",
 		},
 		cli.BoolFlag{
 			Name:  "colors, c",
@@ -170,15 +178,22 @@ func main() {
 	if conf.StringValue["outputType"] == "table" {
 		printTable(conf, domains)
 	} else if conf.StringValue["outputType"] == "json" {
-		domainsData := domainsHolder{Domains: []*domain.DomainData{}}
+		domainsData := domainsHolder{Domains: []*domain.Data{}}
 		for _, d := range domains {
-			domainsData.Domains = append(domainsData.Domains, d.GetData(conf.LocationValue["location"]))
+			data := d.GetData(conf.LocationValue["location"])
+			if conf.BoolValue["onlyExpiring"] && data.DaysLeft >= conf.IntValue["minDays"] {
+				continue
+			}
+			domainsData.Domains = append(domainsData.Domains, data)
 		}
 		jb, _ := json.Marshal(domainsData)
 		fmt.Println(string(jb))
 	} else if conf.StringValue["outputType"] == "text" {
 		for _, d := range domains {
 			data := d.GetData(conf.LocationValue["location"])
+			if conf.BoolValue["onlyExpiring"] && data.DaysLeft >= conf.IntValue["minDays"] {
+				continue
+			}
 			conf.WriterValue["out"].Write([]byte(
 				fmt.Sprintf("%s|%d|%s|%s\n", data.Name, data.DaysLeft, data.EndTime, data.Status),
 			))

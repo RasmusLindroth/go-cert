@@ -21,7 +21,7 @@ func checkConfigDefaults(conf *config) bool {
 	intKeys := []string{"minDays"}
 	stringKeys := []string{"outputType"}
 	stringMultiKeys := []string{"domains"}
-	boolKeys := []string{"colors", "formatting"}
+	boolKeys := []string{"colors", "formatting", "onlyExpiring"}
 	locationKeys := []string{"location"}
 
 	for _, k := range writerKeys {
@@ -75,6 +75,12 @@ func mapConfCli(conf *config, c *cli.Context) *config {
 			FlagConf: &flagConfMap{
 				FlagName:   "formatting",
 				ConfigName: "formatting",
+			},
+		},
+		&boolValue{
+			FlagConf: &flagConfMap{
+				FlagName:   "expiring",
+				ConfigName: "onlyExpiring",
 			},
 		},
 		&intValue{

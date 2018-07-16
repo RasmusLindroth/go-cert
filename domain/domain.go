@@ -18,8 +18,8 @@ func (e *errorStr) Error() string {
 	return e.s
 }
 
-// DomainData holds additional data about a domain, also used for JSON representation
-type DomainData struct {
+// Data holds additional data about a domain, also used for JSON representation
+type Data struct {
 	Name     string    `json:"name"`
 	DaysLeft int       `json:"daysLeft"`
 	EndTime  time.Time `json:"endTime"`
@@ -99,8 +99,8 @@ func (domain *Domain) Status() string {
 }
 
 // GetData returns all data as an struct
-func (domain *Domain) GetData(l *time.Location) *DomainData {
-	obj := &DomainData{
+func (domain *Domain) GetData(l *time.Location) *Data {
+	obj := &Data{
 		Name:     domain.Name,
 		DaysLeft: domain.DaysLeft(l),
 		EndTime:  domain.EndTime(l),
