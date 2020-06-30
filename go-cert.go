@@ -11,7 +11,7 @@ import (
 
 	"github.com/RasmusLindroth/go-cert/domain"
 	tb "github.com/RasmusLindroth/go-cert/table"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 )
 
 //domainsHolder holds multiple DomainData for printing JSON
@@ -31,10 +31,10 @@ func printTable(conf *config, domains []*domain.Domain) {
 
 	t.AddRow(
 		[]*tb.Column{
-			&tb.Column{Text: "Domain", Format: headerFormat},
-			&tb.Column{Text: "Days left", Format: headerFormat},
-			&tb.Column{Text: "End date", Format: headerFormat},
-			&tb.Column{Text: "Status", Format: headerFormat},
+			{Text: "Domain", Format: headerFormat},
+			{Text: "Days left", Format: headerFormat},
+			{Text: "End date", Format: headerFormat},
+			{Text: "Status", Format: headerFormat},
 		},
 	)
 	for _, d := range domains {
@@ -57,10 +57,10 @@ func printTable(conf *config, domains []*domain.Domain) {
 		}
 		t.AddRow(
 			[]*tb.Column{
-				&tb.Column{Text: d.Name},
-				&tb.Column{Text: strconv.Itoa(data.DaysLeft), Format: dayColor},
-				&tb.Column{Text: data.EndTime.Format("2006-01-02 15:04")},
-				&tb.Column{Text: data.Status, Format: statusColor},
+				{Text: d.Name},
+				{Text: strconv.Itoa(data.DaysLeft), Format: dayColor},
+				{Text: data.EndTime.Format("2006-01-02 15:04")},
+				{Text: data.Status, Format: statusColor},
 			},
 		)
 	}
@@ -84,7 +84,7 @@ func main() {
 		},
 
 		StringValues: map[string][]string{
-			"domains": []string{},
+			"domains": {},
 		},
 
 		BoolValue: map[string]bool{
@@ -105,50 +105,55 @@ func main() {
 	app := cli.NewApp()
 	app.Name = "go-cert"
 	app.Usage = "check days left on SSL certificates"
-	app.Version = "0.0.1"
-	app.Authors = []cli.Author{
-		cli.Author{
+	app.Version = "0.0.2"
+	app.Authors = []*cli.Author{
+		{
 			Name:  "Rasmus Lindroth",
 			Email: "rasmus@lindroth.xyz",
 		},
 	}
 	app.UsageText = "go-cert [OPTION]... DOMAIN [DOMAIN ...]"
 	app.ArgsUsage = "domain [domain...]"
+	app.UseShortOptionHandling = true
 
 	app.Flags = []cli.Flag{
-		cli.IntFlag{
-			Name:  "days, d",
-			Usage: "days `INT` left on certificate warning",
-			Value: conf.IntValue["minDays"],
+		&cli.IntFlag{
+			Name:    "days",
+			Aliases: []string{"d"},
+			Usage:   "days `INT` left on certificate warning",
+			Value:   conf.IntValue["minDays"],
 		},
-		cli.StringFlag{
-			Name:  "location, l",
-			Usage: "`LOC` used for time zone, e.g. Europe/Stockholm. Defaults to local",
+		&cli.StringFlag{
+			Name:    "location",
+			Aliases: []string{"l"},
+			Usage:   "`LOC` used for time zone, e.g. Europe/Stockholm. Defaults to local",
 		},
-		cli.StringFlag{
-			Name:  "output, o",
-			Usage: "output `TYPE`: table, json, text (| seperator)",
-			Value: conf.StringValue["outputType"],
+		&cli.StringFlag{
+			Name:    "output",
+			Aliases: []string{"o"},
+			Usage:   "output `TYPE`: table, json, text (| seperator)",
+			Value:   conf.StringValue["outputType"],
 		},
-		cli.BoolFlag{
-			Name:  "expiring, e",
-			Usage: "only list certs where (days left < --days)",
+		&cli.BoolFlag{
+			Name:    "expiring",
+			Aliases: []string{"e"},
+			Usage:   "only list certs where (days left < --days)",
 		},
-		cli.BoolFlag{
-			Name:  "colors, c",
-			Usage: "add colors in table output",
+		&cli.BoolFlag{
+			Name:    "colors",
+			Aliases: []string{"c"},
+			Usage:   "add colors in table output",
 		},
-		cli.BoolFlag{
-			Name:  "formatting, f",
-			Usage: "add bold in table header",
+		&cli.BoolFlag{
+			Name:    "formatting",
+			Aliases: []string{"f"},
+			Usage:   "add bold in table header",
 		},
 	}
 
 	app.Action = func(c *cli.Context) error {
-		if c.NArg() > 0 {
-			for _, d := range c.Args() {
-				conf.StringValues["domains"] = append(conf.StringValues["domains"], d)
-			}
+		for i := 0; i < c.Args().Len(); i++ {
+			conf.StringValues["domains"] = append(conf.StringValues["domains"], c.Args().Get(i))
 		}
 
 		mapConfCli(conf, c)
